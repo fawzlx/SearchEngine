@@ -4,5 +4,5 @@ namespace SearchEngine.Service.Search;
 
 public interface ISearcher
 {
-    Task<IEnumerable<SearchResultDto>> SearchQuery(string query);
+    Task<SearchResultDto> SearchQuery(string query);
 }

@@ -6,7 +6,7 @@ public class WordDto
     {
         Name = name;
     }
-
+    
     public string Name { get; set; }
     public int Score => Name.Sum(x => x);
 }

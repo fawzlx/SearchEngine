@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
 
 namespace SearchEngine.Database.Entities;
 
@@ -8,6 +9,12 @@ public class InvertedIndexWordDocument
     {
         Key = key;
         Value = value;
+    }
+
+    public InvertedIndexWordDocument(string key, object value)
+    {
+        Key = key;
+        Value = JsonConvert.SerializeObject(value);
     }
 
     [Key]

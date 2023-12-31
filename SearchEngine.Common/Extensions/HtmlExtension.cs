@@ -41,25 +41,10 @@ public static class HtmlExtension
 
     public static IEnumerable<string> GetWords(this string content)
     {
-        // Replace all style tags with space
-        content = Regex.Replace(content, @"<style.*</style>", " ");
+        content = content.NormalizeHtml();
 
-        // Replace all script tags with space
-        content = Regex.Replace(content, @"<script.*</script>", " ");
-
-        // Replace all tags with a space
-        content = Regex.Replace(content, "<(.|\n)+?>", " ");
-
-        // Remove all WhiteSpace and compress all WhiteSpace to one space
-        content = Regex.Replace(content, @"\s+", " ");
-
-        content = content
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;");
-
-        content = content.NormalizeString();
-
-        return content.Split(' ').Where(x => x.Length > 1 || int.TryParse(x, out _));
+        return content.Split(' ')
+            .Where(x => x.Length is > 1 and < 15 || int.TryParse(x, out _));
     }
 
     public static IDictionary<string, int> UniqueWords(this IEnumerable<string> words)
@@ -68,11 +53,38 @@ public static class HtmlExtension
             .ToDictionary(x => x.Key, y => y.Count());
     }
 
-    private static string NormalizeString(this string input)
+    public static string NormalizeHtml(this string content)
+    {
+        return content.RemoveAllTags()
+            .NormalizeString();
+    }
+
+    private static string RemoveTags(this string html, params string[] tags)
+    {
+        return tags
+            .Aggregate(html, (current, tag) => new Regex($@"<{tag}[^>]*>[\s\S]*?</{tag}>")
+                .Replace(current, ""));
+    }
+
+    private static string RemoveAllTags(this string html)
+    {
+        html = html.RemoveTags("script", "noscript", "style", "title");
+        html = Regex.Replace(html, "<(.|\n)+?>", " ");
+        html = Regex.Replace(html, @"\s+", " ");
+        html = html
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;");
+
+        return html;
+    }
+
+    public static string NormalizeString(this string input)
     {
         const string pattern = "[\\~#%&*{}/:;,.،!()<>«»?|\"-]";
 
         input = Regex.Replace(input, pattern, "");
+
+        input = Regex.Replace(input, @"\s+", " ");
 
         input = input
             .Replace("ﮎ", "ک")

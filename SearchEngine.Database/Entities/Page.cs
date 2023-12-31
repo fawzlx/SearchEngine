@@ -11,6 +11,7 @@ public class Page
         Content = content;
         Title = content.GetTitle();
         CrawlTime = DateTime.Now;
+        NormalizeBody = content.NormalizeHtml();
     }
 
     public Page(string url, string content, DateTime crawlTime)
@@ -19,6 +20,7 @@ public class Page
         Content = content;
         Title = content.GetTitle();
         CrawlTime = crawlTime;
+        NormalizeBody = content.NormalizeHtml();
     }
 
     [Key]
@@ -29,6 +31,8 @@ public class Page
     [StringLength(300)] public string Url { get; set; }
 
     public string Content { get; set; }
+
+    public string NormalizeBody { get; set; }
 
     public DateTime CrawlTime { get; set; }
 }

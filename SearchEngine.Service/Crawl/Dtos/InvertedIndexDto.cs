@@ -37,20 +37,4 @@ public class InvertedIndexWordDocumentDto
     public string Key { get; set; }
 
     public IList<WordDocumentScoreDto> Documents { get; set; }
-
-    public InvertedIndexWordDocument ConvertToModel() => new(Key, JsonConvert.SerializeObject(Documents));
-
-    public void AddDocument(int wordsTitle, int pageId, int wordsBody)
-    {
-        var document = Documents.FirstOrDefault(x => x.PageId == pageId);
-
-        if (document == null)
-        {
-            Documents.Add(new WordDocumentScoreDto(wordsTitle, pageId, wordsBody));
-            return;
-        }
-
-        document.WordsBody += wordsBody;
-        document.WordsTitle += wordsTitle;
-    }
 }

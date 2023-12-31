@@ -2,15 +2,16 @@
 
 namespace SearchEngine.Service.Search.Dtos;
 
-public class WordDistanceDto
+public class WordDistanceDto : WordDto
 {
-    public WordDistanceDto(string name, string target)
+    public WordDistanceDto(string name, string target) : base(name)
     {
         Name = name;
         Target = target;
     }
 
-    public string Name { get; set; }
     public string Target { get; set; }
-    public int Score => Name.ToCompare(Target);
+    public int Distance => Name.ToCompare(Target);
+
+    public int ScoreDistance => Math.Abs(Score - Target.Sum(y => y));
 }

@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using SearchEngine.Common.Extensions;
 using SearchEngine.Database;
 using SearchEngine.Service.Crawl.Dtos;
 using SearchEngine.Service.Search.Dtos;
@@ -22,33 +24,77 @@ public class Searcher : ISearcher
         _words = _wordDocuments.Select(x => new WordDto(x.Key)).ToHashSet();
     }
 
-    public async Task<IEnumerable<SearchResultDto>> SearchQuery(string query)
+    public async Task<SearchResultDto> SearchQuery(string query)
     {
-        var queryWords = query.Split(' ').Where(x => x.Length > 1);
-        queryWords = CorrectMissWords(queryWords);
+        query = query.NormalizeString();
 
-        if (!queryWords.Any())
-            return new List<SearchResultDto>();
+        var queryWords = query.GetWords().ToList();
 
-        return new List<SearchResultDto>();
+        var correctedQueryWords = CorrectMissWords(queryWords).ToList();
+
+        var searchTime = new Stopwatch();
+        searchTime.Start();
+
+        var wordDocuments = SearchPages(correctedQueryWords);
+
+        searchTime.Stop();
+
+        var correctedQuery = string.Join(' ', correctedQueryWords);
+
+        correctedQuery = correctedQuery.Equals(query, StringComparison.InvariantCultureIgnoreCase)
+            ? string.Empty
+            : correctedQuery;
+
+        return new SearchResultDto(correctedQuery, wordDocuments, searchTime.ElapsedMilliseconds);
+    }
+
+    public IList<PageDto> SearchPages(IList<string> queries)
+    {
+        IEnumerable<WordDocumentScoreDto> result = null;
+
+        foreach (var query in queries)
+        {
+            if (result is null)
+            {
+                result = _wordDocuments[query];
+                continue;
+            }
+
+            result = result.Join(_wordDocuments[query], a => a.PageId, b => b.PageId,
+                    (a, b) =>
+                        new WordDocumentScoreDto(string.Join("...", a.Summary, b.Summary), a.Url, a.PageId,
+                            a.WordsTitle + b.WordsTitle,
+                            a.WordsBody + b.WordsBody,
+                            a.Title))
+                .ToList();
+        }
+
+        return result?.OrderByDescending(x => x.Score)
+            .Select(x => new PageDto(x.Summary, x.Url, x.Title)).ToList() ?? new List<PageDto>();
     }
 
     private IEnumerable<string> CorrectMissWords(IEnumerable<string> queries)
     {
-        var result = new List<string>();
-
         foreach (var query in queries)
         {
+            if (_wordDocuments.ContainsKey(query))
+            {
+                yield return query;
+                continue;
+            }
+
             var word = _words
-                .Where(x => x.Score - query.Sum(y => y) <= 165)
-                .Select(x => new WordDistanceDto(x.Name, query)).MinBy(x => x.Score);
+                .Where(x => Math.Abs(x.Score - query.Sum(y => y)) <= 2000)
+                .Select(x => new WordDistanceDto(x.Name, query))
+                .Where(x => x.Distance < 4)
+                .OrderBy(x => x.Distance)
+                .ThenBy(x => x.ScoreDistance)
+                .FirstOrDefault();
 
             if (word is null)
-                return new List<string>();
+                break;
 
-            result.Add(word.Name);
+            yield return word.Name;
         }
-
-        return result;
     }
 }

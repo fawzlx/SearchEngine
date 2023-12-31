@@ -1,8 +1,9 @@
-﻿using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SearchEngine.Common.Extensions;
 using SearchEngine.Database;
+using SearchEngine.Database.Entities;
 using SearchEngine.Service.Crawl.Dtos;
+using System.Diagnostics;
 
 namespace SearchEngine.Service.Crawl;
 
@@ -10,20 +11,24 @@ public class WordDocumentIndex : IWordDocumentIndex
 {
     private readonly SearchEngineDbContext _dboContext;
 
-    private readonly IList<InvertedIndexWordDocumentDto> _wordDocuments;
+    private readonly IDictionary<string, IList<WordDocumentScoreDto>> _wordDocuments;
 
     public WordDocumentIndex(SearchEngineDbContext dboContext)
     {
         _dboContext = dboContext;
 
-        _wordDocuments = new List<InvertedIndexWordDocumentDto>();
+        _wordDocuments = new Dictionary<string, IList<WordDocumentScoreDto>>();
     }
 
     public async Task Execute(CancellationToken cancellationToken = default)
     {
-        var pages = await _dboContext.Pages.AsNoTracking().ToListAsync(cancellationToken);
+        var pages = await _dboContext.Pages.AsNoTracking()
+            .Select(x => new NormalizedPageDto(x))
+            .ToListAsync(cancellationToken);
 
         var a = new Stopwatch();
+
+        a.Start();
 
         foreach (var page in pages)
         {
@@ -31,37 +36,40 @@ public class WordDocumentIndex : IWordDocumentIndex
                 .GetWords()
                 .UniqueWords();
 
-            var wordsInContent = page.Content
+            var wordsInContent = page.NormalizeBody
                 .GetWords()
                 .UniqueWords();
 
             foreach (var word in wordsInContent)
-                AddWordDocument(word.Key, page.Id, 0, word.Value);
+                AddWordDocument(word.Key, page, 0, word.Value);
 
             foreach (var word in wordsInTitle)
-                AddWordDocument(word.Key, page.Id, word.Value, 0);
+                AddWordDocument(word.Key, page, word.Value, 0);
         }
 
         a.Stop();
 
         Console.WriteLine(a.ElapsedTicks);
 
-        await _dboContext.Words.AddRangeAsync(_wordDocuments.Select(x => x.ConvertToModel()), cancellationToken);
+        await _dboContext.Words.AddRangeAsync(
+            _wordDocuments.Select(x =>
+                new InvertedIndexWordDocument(x.Key, x.Value)),
+            cancellationToken);
 
         await _dboContext.SaveChangesAsync(cancellationToken);
     }
 
-    private void AddWordDocument(string word, int pageId, int wordsInTitle, int wordsInContent)
+    private void AddWordDocument(string word, NormalizedPageDto page, int wordsInTitle, int wordsInContent)
     {
-        var wordDoc = _wordDocuments.FirstOrDefault(x => string.Equals(x.Key, word));
+        var wordDocumentScoreDto = new WordDocumentScoreDto(wordsInTitle, wordsInContent, page, word);
 
-        if (wordDoc is null)
+        if (_wordDocuments.TryGetValue(word, out var document))
         {
-            _wordDocuments.Add(new InvertedIndexWordDocumentDto(0, word,
-                new WordDocumentScoreDto(wordsInTitle, pageId, wordsInContent)));
+            document.Add(wordDocumentScoreDto);
+
             return;
         }
 
-        wordDoc.AddDocument(wordsInTitle, pageId, wordsInContent);
+        _wordDocuments.Add(word, new List<WordDocumentScoreDto> { wordDocumentScoreDto });
     }
 }
