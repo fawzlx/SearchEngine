@@ -1,9 +1,9 @@
-﻿using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SearchEngine.Common.Extensions;
 using SearchEngine.Database;
 using SearchEngine.Service.Crawl.Dtos;
 using SearchEngine.Service.Search.Dtos;
+using System.Diagnostics;
 
 namespace SearchEngine.Service.Search;
 
@@ -35,7 +35,7 @@ public class Searcher : ISearcher
 
         var correctedQueryWords = CorrectMissWords(queryWords).ToList();
 
-        var wordDocuments = SearchPages(correctedQueryWords);
+        var wordDocuments = SearchPagesRepeated(queryWords, ref correctedQueryWords);
 
         searchTime.Stop();
 
@@ -48,11 +48,40 @@ public class Searcher : ISearcher
         return new SearchResultDto(correctedQuery, wordDocuments, query, searchTime.ElapsedMilliseconds);
     }
 
+    private IList<PageDto> SearchPagesRepeated(IReadOnlyList<string> queryWords, ref List<string> correctedQueryWords)
+    {
+        IList<PageDto> wordDocuments = new List<PageDto>();
+
+        for (var i = 0; i < correctedQueryWords.Count; i++)
+        {
+            wordDocuments = SearchPages(correctedQueryWords);
+
+            if (wordDocuments.Any())
+                break;
+
+            for (var j = 0; j < 3; j++)
+            {
+                var newQuery = NewQuery(correctedQueryWords, i, queryWords[i], j);
+
+                wordDocuments = SearchPages(newQuery);
+
+                if (!wordDocuments.Any())
+                    continue;
+
+                correctedQueryWords = newQuery.ToList();
+
+                return wordDocuments; ;
+            }
+        }
+
+        return wordDocuments;
+    }
+
     public IList<PageDto> SearchPages(IList<string> queries)
     {
         IEnumerable<WordDocumentScoreDto> result = null;
 
-        foreach (var query in queries)
+        foreach (var query in queries.OrderBy(_ => Guid.NewGuid()).ToList())
         {
             if (result is null)
             {
@@ -67,6 +96,9 @@ public class Searcher : ISearcher
                             a.WordsBody + b.WordsBody,
                             a.Title))
                 .ToList();
+
+            if (!result.Any())
+                return new List<PageDto>();
         }
 
         return result?.OrderByDescending(x => x.Score)
@@ -83,6 +115,13 @@ public class Searcher : ISearcher
                 continue;
             }
 
+            var a = _words
+                .Where(x => Math.Abs(x.Score - query.Sum(y => y)) <= 2000)
+                .Select(x => new WordDistanceDto(x.Name, query))
+                .Where(x => x.Distance < 4)
+                .OrderBy(x => x.Distance)
+                .ThenBy(x => x.ScoreDistance).ToList();
+
             var word = _words
                 .Where(x => Math.Abs(x.Score - query.Sum(y => y)) <= 2000)
                 .Select(x => new WordDistanceDto(x.Name, query))
@@ -96,5 +135,27 @@ public class Searcher : ISearcher
 
             yield return word.Name;
         }
+    }
+
+    private IList<string> NewQuery(IEnumerable<string> queries, int removeIndex, string query, int skip = 0)
+    {
+        var result = new List<string>(queries)
+        {
+            [removeIndex] = NearestWord(query, skip)
+        };
+
+        return result;
+    }
+
+    private string NearestWord(string word, int skip = 0)
+    {
+        return _words
+            .Where(x => Math.Abs(x.Score - word.Sum(y => y)) <= 2000)
+            .Select(x => new WordDistanceDto(x.Name, word))
+            .Where(x => x.Distance > 0)
+            .OrderBy(x => x.Distance)
+            .ThenBy(x => x.ScoreDistance)
+            .Skip(skip)
+            .First().Name;
     }
 }
