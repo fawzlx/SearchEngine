@@ -82,6 +82,8 @@ public static class HtmlExtension
     {
         const string pattern = "[\\~#%&*{}/:;,.،!()<>«»?|\"-]";
 
+        input = input.Trim();
+
         input = Regex.Replace(input, pattern, "");
 
         input = Regex.Replace(input, @"\s+", " ");

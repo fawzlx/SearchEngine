@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SearchEngine.Database;
+using SearchEngine.Presentation.Components;
 using SearchEngine.Service.Crawl;
 using SearchEngine.Service.Fetcher;
 using SearchEngine.Service.Search;
@@ -17,7 +18,10 @@ builder.Services.AddScoped<IFetcher, Fetcher>();
 builder.Services.AddScoped<ISearcher, Searcher>();
 builder.Services.AddScoped<IWordDocumentIndex, WordDocumentIndex>();
 
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -33,6 +37,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
@@ -41,6 +46,10 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
+app.UseStaticFiles();
+
+app.UseAntiforgery();
+
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();

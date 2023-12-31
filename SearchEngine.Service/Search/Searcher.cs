@@ -24,16 +24,16 @@ public class Searcher : ISearcher
         _words = _wordDocuments.Select(x => new WordDto(x.Key)).ToHashSet();
     }
 
-    public async Task<SearchResultDto> SearchQuery(string query)
+    public SearchResultDto SearchQuery(string query)
     {
+        var searchTime = new Stopwatch();
+        searchTime.Start();
+
         query = query.NormalizeString();
 
         var queryWords = query.GetWords().ToList();
 
         var correctedQueryWords = CorrectMissWords(queryWords).ToList();
-
-        var searchTime = new Stopwatch();
-        searchTime.Start();
 
         var wordDocuments = SearchPages(correctedQueryWords);
 
@@ -45,7 +45,7 @@ public class Searcher : ISearcher
             ? string.Empty
             : correctedQuery;
 
-        return new SearchResultDto(correctedQuery, wordDocuments, searchTime.ElapsedMilliseconds);
+        return new SearchResultDto(correctedQuery, wordDocuments, query, searchTime.ElapsedMilliseconds);
     }
 
     public IList<PageDto> SearchPages(IList<string> queries)

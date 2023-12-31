@@ -33,11 +33,11 @@ public class NormalizedPageDto
         var nextWords = NormalizeBody.Substring(firstIndex).Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (lastWords.Length < 20)
-            result.Append(string.Join(' ', nextWords.Take(40 - lastWords.Length)));
+            result.Append(' ').Append(string.Join(' ', nextWords.Take(40 - lastWords.Length)));
         else if (nextWords.Length <= 20)
-            result.Clear().Append(string.Join(' ', lastWords.Take(40 - nextWords.Length))).Append(string.Join(' ', nextWords));
+            result.Clear().Append(string.Join(' ', lastWords.Take(40 - nextWords.Length))).Append(' ').Append(string.Join(' ', nextWords));
         else if (nextWords.Length > 20)
-            result.Append(string.Join(' ', nextWords.Take(40)));
+            result.Append(' ').Append(string.Join(' ', nextWords.Take(40)));
 
         return result.ToString();
     }
